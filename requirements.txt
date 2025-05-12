@@ -57,7 +57,7 @@ pyttsx3==2.90
 pytz==2023.3
 referencing==0.36.2
 requests==2.31.0
-rich==14.0.0
+rich==13.7.1
 rpds-py==0.22.3
 scikit-learn==1.6.1
 scipy==1.15.1
