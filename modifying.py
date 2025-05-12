@@ -461,7 +461,7 @@ xgb_model = load_model()  # Load the pre-trained model
 # --- Data Loading Function ---
 @st.cache_data(ttl=3600)
 def load_dataset():
-    dataset_path = "C:\\Users\\ANITHA\\Downloads\\fake_id\\fake_id\\datas.csv"
+    dataset_path = "datas.csv"
     dataset = pd.read_csv(dataset_path)
     return dataset
 
