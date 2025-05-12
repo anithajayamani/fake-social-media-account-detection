@@ -244,7 +244,7 @@ st.markdown("""
 # --- App Header ---
 col1, col2 = st.columns([1, 9])
 with col1:
-    st.image("C:\\Users\\ANITHA\\Downloads\\fake_id\\fake_id\\logo.png.webp", width=100)
+    st.image("logo.png.webp", width=100)
 with col2:
     st.title("InstaGuard: Advanced Fake Account Detector")
     st.markdown("""
