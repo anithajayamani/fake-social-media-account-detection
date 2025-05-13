@@ -261,29 +261,105 @@ EXPECTED_COLUMNS = [
 MODEL_FILENAME = "xgb_model.json"  # Assumes pre-trained model exists
 
 # Fetch Instagram Profile Data
+# @st.cache_data(ttl=3600)
+# def fetch_instagram_data(username):
+#     loader = instaloader.Instaloader()
+#     print("loaded fetch_instagram_data ")
+#     try:
+#         profile = instaloader.Profile.from_username(loader.context, username)
+#         return {
+#             "followers": profile.followers,
+#             "following": profile.followees,
+#             "bio": profile.biography,
+#             "profile_pic_url": profile.profile_pic_url,
+#             "post_count": profile.mediacount,
+#             "is_private": profile.is_private,
+#             "is_verified": profile.is_verified,
+#             "success": True
+#         }
+#     except instaloader.exceptions.QueryReturnedNotFoundException:
+#         return {"success": False, "error": "Profile not found"}
+#     except instaloader.exceptions.LoginRequiredException:
+#         return {"success": False, "error": "Login required to view this profile"}
+#     except Exception as e:
+#         return {"success": False, "error": str(e)}
+# Updated fetch_instagram_data function with rate limiting and error handling
 @st.cache_data(ttl=3600)
 def fetch_instagram_data(username):
-    loader = instaloader.Instaloader()
-    print("loaded fetch_instagram_data ")
-    try:
-        profile = instaloader.Profile.from_username(loader.context, username)
-        return {
-            "followers": profile.followers,
-            "following": profile.followees,
-            "bio": profile.biography,
-            "profile_pic_url": profile.profile_pic_url,
-            "post_count": profile.mediacount,
-            "is_private": profile.is_private,
-            "is_verified": profile.is_verified,
-            "success": True
-        }
-    except instaloader.exceptions.QueryReturnedNotFoundException:
-        return {"success": False, "error": "Profile not found"}
-    except instaloader.exceptions.LoginRequiredException:
-        return {"success": False, "error": "Login required to view this profile"}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    """
+    Fetch Instagram profile data with improved error handling and rate limiting
+    """
+    # Create a status message for the user
+    status = st.empty()
+    status.info("Connecting to Instagram... this may take a moment")
     
+    # Create a custom loader with session handling
+    try:
+        # Set up the instaloader with appropriate options
+        loader = instaloader.Instaloader(
+            quiet=True,                  # Run quietly
+            download_pictures=False,     # Don't download any media
+            download_videos=False,
+            download_video_thumbnails=False,
+            download_geotags=False,
+            download_comments=False,
+            save_metadata=False,
+            compress_json=False
+        )
+        
+        # Add random delay to avoid automated request detection
+        time.sleep(np.random.uniform(1, 3))
+        
+        try:
+            # Try to get profile information
+            profile = instaloader.Profile.from_username(loader.context, username)
+            
+            # Success - prepare the data
+            status.empty()
+            return {
+                "followers": profile.followers,
+                "following": profile.followees,
+                "bio": profile.biography,
+                "profile_pic_url": profile.profile_pic_url,
+                "post_count": profile.mediacount,
+                "is_private": profile.is_private,
+                "is_verified": profile.is_verified,
+                "success": True
+            }
+            
+        except instaloader.exceptions.QueryReturnedNotFoundException:
+            status.empty()
+            return {"success": False, "error": "Profile not found"}
+            
+        except instaloader.exceptions.LoginRequiredException:
+            status.empty()
+            return {"success": False, "error": "This profile requires login to view"}
+            
+        except instaloader.exceptions.ConnectionException as e:
+            status.empty()
+            return {"success": False, "error": f"Connection issue: {str(e)}"}
+            
+        except instaloader.exceptions.TooManyRequestsException:
+            status.empty()
+            return {"success": False, "error": "Too many requests - Instagram is rate limiting this app"}
+            
+        except Exception as e:
+            # Handle any other exceptions
+            status.empty()
+            error_msg = str(e)
+            if "401" in error_msg and "Unauthorized" in error_msg:
+                # Special handling for 401 errors
+                return {
+                    "success": False, 
+                    "error": "Instagram has temporarily blocked this request. Try again later or use mock data for testing."
+                }
+            return {"success": False, "error": f"Error: {error_msg[:100]}"}
+            
+    except Exception as e:
+        status.empty()
+        return {"success": False, "error": f"Failed to initialize Instagram loader: {str(e)}"}
+
+
 # Analyze Bio with Groq LLM
 @st.cache_data(ttl=3600)
 def agent_analyze_bio_with_groq(bio_text):
@@ -504,7 +580,7 @@ def extract_instagram_username(url):
     instagram_pattern = r"https?://(?:www\.)?instagram\.com/([^/?]+)"
     match = re.search(instagram_pattern, url)
     return match.group(1) if match else None
-
+print(extract_instagram_username(""))
 
 # Analyze Profile Completion
 def agent_analyze_profile_completion(profile_data):
