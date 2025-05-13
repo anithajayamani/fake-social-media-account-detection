@@ -645,6 +645,8 @@ def visualize_network_graph(username, followers_count, following_count):
 
 # --- Main Analysis UI ---
 st.markdown("### Enter Instagram Profile to Analyze")
+st.write("API Key:", st.secrets["groq"]["api_key"])
+
 
 with st.container():
     st.markdown("""
