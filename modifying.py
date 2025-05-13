@@ -284,38 +284,50 @@ MODEL_FILENAME = "xgb_model.json"  # Assumes pre-trained model exists
 #     except Exception as e:
 #         return {"success": False, "error": str(e)}
 # Updated fetch_instagram_data function with rate limiting and error handling
+# Fetch Instagram Profile Data with Improved Headers and Retry Logic
 @st.cache_data(ttl=3600)
 def fetch_instagram_data(username):
-    """
-    Fetch Instagram profile data with improved error handling and rate limiting
-    """
-    # Create a status message for the user
-    status = st.empty()
-    status.info("Connecting to Instagram... this may take a moment")
+    # Create a custom instaloader instance with mobile user agent
+    loader = instaloader.Instaloader()
     
-    # Create a custom loader with session handling
-    try:
-        # Set up the instaloader with appropriate options
-        loader = instaloader.Instaloader(
-            quiet=True,                  # Run quietly
-            download_pictures=False,     # Don't download any media
-            download_videos=False,
-            download_video_thumbnails=False,
-            download_geotags=False,
-            download_comments=False,
-            save_metadata=False,
-            compress_json=False
-        )
-        
-        # Add random delay to avoid automated request detection
-        time.sleep(np.random.uniform(1, 3))
-        
+    # Set a mobile user agent to avoid some detection
+    mobile_user_agents = [
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1',
+        'Mozilla/5.0 (Linux; Android 12; SM-G998U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Mobile Safari/537.36',
+        'Mozilla/5.0 (iPad; CPU OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1'
+    ]
+    
+    # Use random user agent from the list
+    import random
+    selected_user_agent = random.choice(mobile_user_agents)
+    loader.context._session.headers['User-Agent'] = selected_user_agent
+    
+    # Add additional common headers
+    loader.context._session.headers.update({
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Referer': 'https://www.instagram.com/',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'X-IG-App-ID': '936619743392459',  # Common Instagram web app ID
+        'X-Requested-With': 'XMLHttpRequest'
+    })
+    
+    # Implement retry logic
+    max_retries = 3
+    retry_delay = 5  # seconds
+    
+    for attempt in range(max_retries):
         try:
-            # Try to get profile information
+            st.write(f"Attempt {attempt+1} to fetch profile data for @{username}")
+            
+            # Try to get profile info
             profile = instaloader.Profile.from_username(loader.context, username)
             
-            # Success - prepare the data
-            status.empty()
+            # Success, return the data
             return {
                 "followers": profile.followers,
                 "following": profile.followees,
@@ -328,36 +340,41 @@ def fetch_instagram_data(username):
             }
             
         except instaloader.exceptions.QueryReturnedNotFoundException:
-            status.empty()
             return {"success": False, "error": "Profile not found"}
             
         except instaloader.exceptions.LoginRequiredException:
-            status.empty()
-            return {"success": False, "error": "This profile requires login to view"}
+            return {"success": False, "error": "Login required to view this profile"}
             
         except instaloader.exceptions.ConnectionException as e:
-            status.empty()
-            return {"success": False, "error": f"Connection issue: {str(e)}"}
-            
-        except instaloader.exceptions.TooManyRequestsException:
-            status.empty()
-            return {"success": False, "error": "Too many requests - Instagram is rate limiting this app"}
-            
+            if attempt < max_retries - 1:
+                st.warning(f"Connection error, retrying in {retry_delay} seconds... ({attempt+1}/{max_retries})")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                return {"success": False, "error": f"Connection error after {max_retries} attempts: {str(e)}"}
+                
+        except instaloader.exceptions.TooManyRequestsException as e:
+            if attempt < max_retries - 1:
+                wait_time = retry_delay * (attempt + 1) * 2
+                st.warning(f"Too many requests, retrying in {wait_time} seconds... ({attempt+1}/{max_retries})")
+                time.sleep(wait_time)  # Longer wait for rate limiting
+            else:
+                return {"success": False, "error": "Instagram rate limit reached. Please try again later."}
+                
         except Exception as e:
-            # Handle any other exceptions
-            status.empty()
             error_msg = str(e)
-            if "401" in error_msg and "Unauthorized" in error_msg:
-                # Special handling for 401 errors
-                return {
-                    "success": False, 
-                    "error": "Instagram has temporarily blocked this request. Try again later or use mock data for testing."
-                }
-            return {"success": False, "error": f"Error: {error_msg[:100]}"}
-            
-    except Exception as e:
-        status.empty()
-        return {"success": False, "error": f"Failed to initialize Instagram loader: {str(e)}"}
+            if "Please wait a few minutes" in error_msg:
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (attempt + 2) * 3  # Even longer wait
+                    st.warning(f"Instagram throttling detected, waiting {wait_time} seconds... ({attempt+1}/{max_retries})")
+                    time.sleep(wait_time)
+                else:
+                    return {"success": False, "error": "Instagram is limiting requests. Please try again in a few minutes."}
+            else:
+                return {"success": False, "error": f"Error fetching data: {error_msg[:100]}"}
+    
+    # If all retries failed
+    return {"success": False, "error": "Failed to retrieve profile data after multiple attempts"}
 
 
 # Analyze Bio with Groq LLM
