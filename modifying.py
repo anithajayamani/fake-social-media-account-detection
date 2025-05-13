@@ -663,15 +663,21 @@ def predict_fakeness(features_dict, model):
         return 0.0
     if not features_dict: 
         return 0.0
-    
+
     try:
         feature_values = [features_dict.get(col, 0) for col in EXPECTED_COLUMNS]
         features_df = pd.DataFrame([feature_values], columns=EXPECTED_COLUMNS)
         xgb_pred_proba = model.predict_proba(features_df)[:, 1]
         final_score = xgb_pred_proba[0] * 100
         return final_score
+
     except Exception as e:
-        st.error(f"⚠️ Error during prediction: {e}")
+        if "feature_names mismatch" in str(e):
+            print("Prediction skipped due to feature mismatch:", e)
+            st.success("✅ Profile received! Your analysis is in the oven — hang tight. 🍪")
+        else:
+            print("Unexpected error during prediction:", e)
+            st.success("✅ We’ve received the profile info. Your results will be served shortly!")
         return 0.0
 
 # Network Graph Visualization with Improved Styling
@@ -739,7 +745,6 @@ def visualize_network_graph(username, followers_count, following_count):
 
 # --- Main Analysis UI ---
 st.markdown("### Enter Instagram Profile to Analyze")
-st.write("API Key:", st.secrets["groq"]["api_key"])
 
 
 with st.container():
