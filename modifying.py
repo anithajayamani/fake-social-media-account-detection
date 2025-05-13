@@ -264,16 +264,6 @@ MODEL_FILENAME = "xgb_model.json"  # Assumes pre-trained model exists
 @st.cache_data(ttl=3600)
 def fetch_instagram_data(username):
     loader = instaloader.Instaloader()
-    
-    # Login using credentials from Streamlit secrets
-    try:
-        loader.login(
-            st.secrets["instagram"]["username"],
-            st.secrets["instagram"]["password"]
-        )
-    except Exception as e:
-        return {"success": False, "error": f"Login failed: {e}"}
-    
     try:
         profile = instaloader.Profile.from_username(loader.context, username)
         return {
