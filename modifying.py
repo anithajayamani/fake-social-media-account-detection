@@ -264,6 +264,7 @@ MODEL_FILENAME = "xgb_model.json"  # Assumes pre-trained model exists
 @st.cache_data(ttl=3600)
 def fetch_instagram_data(username):
     loader = instaloader.Instaloader()
+    print("loaded fetch_instagram_data ")
     try:
         profile = instaloader.Profile.from_username(loader.context, username)
         return {
@@ -680,7 +681,7 @@ if analyze_button:
         st.error("⚠️ Analysis cannot proceed: Pre-trained model not loaded.")
     else:
         username = extract_instagram_username(url)
-
+        print("username: ",username)
         if not username:
             st.error("⚠️ Invalid Instagram URL format. Please enter a valid profile URL.")
         else:
