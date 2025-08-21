@@ -1,5 +1,3 @@
-# Updated Pip Install Command:
-# pip install numpy xgboost pandas streamlit plotly networkx matplotlib instaloader requests Pillow joblib groq
 
 import torch
 import torch.nn as nn
